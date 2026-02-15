@@ -172,9 +172,10 @@ type Upstream_TCP_Transport_BandwidthLimit struct {
 }
 
 type Upstream_UDP struct {
-	Host       string
-	Port       int
-	ServerPort int
+	Host          string
+	Port          int
+	ProxyProtocol *string
+	ServerPort    int
 }
 
 // validateUpstreamServerPorts checks that no two TCP/UDP upstreams use the same server port
@@ -373,6 +374,10 @@ func NewConfig(k8sclient client.Client,
 			upstream.UDP.Host = upstreamObject.Spec.UDP.Host
 			upstream.UDP.Port = upstreamObject.Spec.UDP.Port
 			upstream.UDP.ServerPort = upstreamObject.Spec.UDP.Server.Port
+
+			if upstreamObject.Spec.UDP.ProxyProtocol != nil {
+				upstream.UDP.ProxyProtocol = upstreamObject.Spec.UDP.ProxyProtocol
+			}
 		}
 
 		if upstreamObject.Spec.STCP != nil {

@@ -110,9 +110,10 @@ type UpstreamSpec_TCP_Transport_BandwdithLimit struct {
 }
 
 type UpstreamSpec_UDP struct {
-	Host   string                  `json:"host"`
-	Port   int                     `json:"port"`
-	Server UpstreamSpec_UDP_Server `json:"server"`
+	Host          string                  `json:"host"`
+	Port          int                     `json:"port"`
+	ProxyProtocol *string                 `json:"proxyProtocol"`
+	Server        UpstreamSpec_UDP_Server `json:"server"`
 }
 
 type UpstreamSpec_UDP_Server struct {

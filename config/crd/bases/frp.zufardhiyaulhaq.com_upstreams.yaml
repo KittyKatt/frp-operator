@@ -189,6 +189,8 @@ spec:
                     type: string
                   port:
                     type: integer
+                  proxyProtocol:
+                    type: string
                   server:
                     properties:
                       port:
@@ -199,6 +201,7 @@ spec:
                 required:
                 - host
                 - port
+                - proxyProtocol
                 - server
                 type: object
               xtcp:

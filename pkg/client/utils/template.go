@@ -62,6 +62,10 @@ type = "udp"
 localIP = "{{ $upstream.UDP.Host }}"
 localPort = {{ $upstream.UDP.Port }}
 remotePort = {{ $upstream.UDP.ServerPort }}
+
+{{ if $upstream.UDP.ProxyProtocol }}
+transport.proxyProtocolVersion = "{{ $upstream.UDP.ProxyProtocol }}"
+{{ end }}
 {{ end }}
 
 {{ if eq $upstream.Type 3 }}

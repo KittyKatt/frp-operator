@@ -362,6 +362,30 @@ func TestConfigurationBuilder_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "UDP upstream with proxy protocol",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "udp-with-proxy-protocol",
+						Type: 2, // UDP
+						UDP: models.Upstream_UDP{
+							Host:          "127.0.0.1",
+							Port:          53,
+							ServerPort:    5353,
+							ProxyProtocol: stringPtr("v2"),
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "udp-with-proxy-protocol"`,
+				`type = "udp"`,
+				`transport.proxyProtocolVersion = "v2"`,
+			},
+		},
+		{
 			name: "STCP upstream - basic",
 			config: models.Config{
 				Common: basicCommon(),

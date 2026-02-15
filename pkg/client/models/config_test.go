@@ -785,9 +785,10 @@ func TestNewConfig_UDPUpstream(t *testing.T) {
 			ObjectMeta: metav1.ObjectMeta{Name: "udp-upstream"},
 			Spec: frpv1alpha1.UpstreamSpec{
 				UDP: &frpv1alpha1.UpstreamSpec_UDP{
-					Host:   "127.0.0.1",
-					Port:   53,
-					Server: frpv1alpha1.UpstreamSpec_UDP_Server{Port: 5353},
+					Host:          "127.0.0.1",
+					Port:          53,
+					ProxyProtocol: stringPtr("v2"),
+					Server:        frpv1alpha1.UpstreamSpec_UDP_Server{Port: 5353},
 				},
 			},
 		},
@@ -803,6 +804,9 @@ func TestNewConfig_UDPUpstream(t *testing.T) {
 	}
 
 	upstream := config.Upstreams[0]
+	if upstream.UDP.ProxyProtocol == nil || *upstream.UDP.ProxyProtocol != "v2" {
+		t.Errorf("NewConfig() upstream.UDP.ProxyProtocol = %v, want v2", upstream.UDP.ProxyProtocol)
+	}
 	if upstream.Type != 2 {
 		t.Errorf("NewConfig() upstream.Type = %v, want 2 (UDP)", upstream.Type)
 	}
