@@ -84,6 +84,120 @@ func TestConfigurationBuilder_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "common config with TLS enabled",
+			config: models.Config{
+				Common: models.Common{
+					ServerAddress: "frp.example.com",
+					ServerPort:    7000,
+					AdminAddress:  "0.0.0.0",
+					AdminPort:     7400,
+					AdminUsername: "admin",
+					AdminPassword: "secret",
+					TLS: &models.TLSConfig{
+						Enable: true,
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`transport.tls.enable = true`,
+			},
+			wantNotContain: []string{
+				`transport.tls.certFile`,
+				`transport.tls.keyFile`,
+				`transport.tls.trustedCaFile`,
+			},
+		},
+		{
+			name: "common config with TLS and certificates",
+			config: models.Config{
+				Common: models.Common{
+					ServerAddress: "frp.example.com",
+					ServerPort:    7000,
+					AdminAddress:  "0.0.0.0",
+					AdminPort:     7400,
+					AdminUsername: "admin",
+					AdminPassword: "secret",
+					TLS: &models.TLSConfig{
+						Enable:        true,
+						CertFile:      "/etc/frp/tls/tls.crt",
+						KeyFile:       "/etc/frp/tls/tls.key",
+						TrustedCAFile: "/etc/frp/tls/ca.crt",
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`transport.tls.enable = true`,
+				`transport.tls.certFile = "/etc/frp/tls/tls.crt"`,
+				`transport.tls.keyFile = "/etc/frp/tls/tls.key"`,
+				`transport.tls.trustedCaFile = "/etc/frp/tls/ca.crt"`,
+			},
+		},
+		{
+			name: "common config with OIDC authentication",
+			config: models.Config{
+				Common: models.Common{
+					ServerAddress: "frp.example.com",
+					ServerPort:    7000,
+					ServerAuthentication: models.ServerAuthentication{
+						Type:             2, // OIDC
+						OIDCClientID:     "my-client-id",
+						OIDCClientSecret: "my-client-secret",
+						OIDCTokenURL:     "https://auth.example.com/oauth/token",
+						OIDCAudience:     "frp-server",
+						OIDCScope:        "openid profile",
+					},
+					AdminAddress:  "0.0.0.0",
+					AdminPort:     7400,
+					AdminUsername: "admin",
+					AdminPassword: "secret",
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`auth.method = "oidc"`,
+				`auth.oidc.clientID = "my-client-id"`,
+				`auth.oidc.clientSecret = "my-client-secret"`,
+				`auth.oidc.tokenEndpointURL = "https://auth.example.com/oauth/token"`,
+				`auth.oidc.audience = "frp-server"`,
+				`auth.oidc.scope = "openid profile"`,
+			},
+			wantNotContain: []string{
+				`auth.token`,
+			},
+		},
+		{
+			name: "common config with OIDC without optional fields",
+			config: models.Config{
+				Common: models.Common{
+					ServerAddress: "frp.example.com",
+					ServerPort:    7000,
+					ServerAuthentication: models.ServerAuthentication{
+						Type:             2, // OIDC
+						OIDCClientID:     "my-client-id",
+						OIDCClientSecret: "my-client-secret",
+						OIDCTokenURL:     "https://auth.example.com/oauth/token",
+					},
+					AdminAddress:  "0.0.0.0",
+					AdminPort:     7400,
+					AdminUsername: "admin",
+					AdminPassword: "secret",
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`auth.method = "oidc"`,
+				`auth.oidc.clientID = "my-client-id"`,
+				`auth.oidc.clientSecret = "my-client-secret"`,
+				`auth.oidc.tokenEndpointURL = "https://auth.example.com/oauth/token"`,
+			},
+			wantNotContain: []string{
+				`auth.oidc.audience`,
+				`auth.oidc.scope`,
+			},
+		},
+		{
 			name: "TCP upstream - basic",
 			config: models.Config{
 				Common: basicCommon(),
@@ -502,6 +616,53 @@ func TestConfigurationBuilder_Build(t *testing.T) {
 			},
 		},
 		{
+			name: "STCP upstream with allowUsers",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "stcp-with-allowusers",
+						Type: 3,
+						STCP: models.Upstream_STCP{
+							Host:       "127.0.0.1",
+							Port:       22,
+							SecretKey:  "secret",
+							AllowUsers: []string{"user1", "user2"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "stcp-with-allowusers"`,
+				`type = "stcp"`,
+				`allowUsers = ["user1", "user2"]`,
+			},
+		},
+		{
+			name: "STCP upstream with allowUsers wildcard",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "stcp-allow-all",
+						Type: 3,
+						STCP: models.Upstream_STCP{
+							Host:       "127.0.0.1",
+							Port:       22,
+							SecretKey:  "secret",
+							AllowUsers: []string{"*"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "stcp-allow-all"`,
+				`allowUsers = ["*"]`,
+			},
+		},
+		{
 			name: "XTCP upstream - basic",
 			config: models.Config{
 				Common: basicCommon(),
@@ -615,6 +776,53 @@ func TestConfigurationBuilder_Build(t *testing.T) {
 				`transport.bandwidthLimit = "500MB"`,
 				`transport.bandwidthLimitMode = "client"`,
 				`transport.proxyURL = "socks5://proxy:1080"`,
+			},
+		},
+		{
+			name: "XTCP upstream with allowUsers",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "xtcp-with-allowusers",
+						Type: 4,
+						XTCP: models.Upstream_STCP{
+							Host:       "127.0.0.1",
+							Port:       3389,
+							SecretKey:  "secret",
+							AllowUsers: []string{"admin", "operator"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "xtcp-with-allowusers"`,
+				`type = "xtcp"`,
+				`allowUsers = ["admin", "operator"]`,
+			},
+		},
+		{
+			name: "XTCP upstream with allowUsers wildcard",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "xtcp-allow-all",
+						Type: 4,
+						XTCP: models.Upstream_STCP{
+							Host:       "127.0.0.1",
+							Port:       3389,
+							SecretKey:  "secret",
+							AllowUsers: []string{"*"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "xtcp-allow-all"`,
+				`allowUsers = ["*"]`,
 			},
 		},
 		{
@@ -901,6 +1109,402 @@ func TestConfigurationBuilder_Build(t *testing.T) {
 				`name = "remote-access"`,
 				`type = "stcp"`,
 				`serverName = "remote-server"`,
+			},
+		},
+		{
+			name: "HTTP upstream - basic with subdomain",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "my-http-service",
+						Type: 5, // HTTP
+						HTTP: models.Upstream_HTTP{
+							Host:      "web-service.default.svc",
+							Port:      8080,
+							Subdomain: "webapp",
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`[[proxies]]`,
+				`name = "my-http-service"`,
+				`type = "http"`,
+				`localIP = "web-service.default.svc"`,
+				`localPort = 8080`,
+				`subdomain = "webapp"`,
+			},
+			wantNotContain: []string{
+				`customDomains`,
+				`locations`,
+				`hostHeaderRewrite`,
+			},
+		},
+		{
+			name: "HTTP upstream - with custom domains",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "http-custom-domains",
+						Type: 5,
+						HTTP: models.Upstream_HTTP{
+							Host:          "api-service.default.svc",
+							Port:          8080,
+							CustomDomains: []string{"api.example.com", "api2.example.com"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "http-custom-domains"`,
+				`type = "http"`,
+				`customDomains = ["api.example.com", "api2.example.com"]`,
+			},
+		},
+		{
+			name: "HTTP upstream - with locations and headers",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "http-full",
+						Type: 5,
+						HTTP: models.Upstream_HTTP{
+							Host:              "api-service.default.svc",
+							Port:              8080,
+							Subdomain:         "api",
+							Locations:         []string{"/v1", "/v2"},
+							HostHeaderRewrite: "internal-api.local",
+							RequestHeaders:    map[string]string{"X-Forwarded-By": "frp-operator"},
+							ResponseHeaders:   map[string]string{"X-Frame-Options": "DENY"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "http-full"`,
+				`subdomain = "api"`,
+				`locations = ["/v1", "/v2"]`,
+				`hostHeaderRewrite = "internal-api.local"`,
+				`requestHeaders.set.X-Forwarded-By = "frp-operator"`,
+				`responseHeaders.set.X-Frame-Options = "DENY"`,
+			},
+		},
+		{
+			name: "HTTP upstream - with auth and health check",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "http-auth",
+						Type: 5,
+						HTTP: models.Upstream_HTTP{
+							Host:         "protected.default.svc",
+							Port:         8080,
+							Subdomain:    "admin",
+							HTTPUser:     "admin",
+							HTTPPassword: "secret123",
+							HealthCheck: &models.Upstream_HTTP_HealthCheck{
+								Type:            "http",
+								Path:            "/health",
+								TimeoutSeconds:  5,
+								IntervalSeconds: 10,
+								MaxFailed:       3,
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "http-auth"`,
+				`httpUser = "admin"`,
+				`httpPassword = "secret123"`,
+				`healthCheck.type = "http"`,
+				`healthCheck.path = "/health"`,
+				`healthCheck.timeoutSeconds = 5`,
+			},
+		},
+		{
+			name: "HTTPS upstream - basic",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "my-https-service",
+						Type: 6, // HTTPS
+						HTTPS: models.Upstream_HTTPS{
+							Host:          "secure-app.default.svc",
+							Port:          443,
+							CustomDomains: []string{"secure.example.com"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`[[proxies]]`,
+				`name = "my-https-service"`,
+				`type = "https"`,
+				`localIP = "secure-app.default.svc"`,
+				`localPort = 443`,
+				`customDomains = ["secure.example.com"]`,
+			},
+		},
+		{
+			name: "HTTPS upstream - with proxy protocol",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "https-proxy-protocol",
+						Type: 6,
+						HTTPS: models.Upstream_HTTPS{
+							Host:          "app.default.svc",
+							Port:          443,
+							CustomDomains: []string{"app.example.com"},
+							ProxyProtocol: stringPtr("v2"),
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "https-proxy-protocol"`,
+				`type = "https"`,
+				`transport.proxyProtocolVersion = "v2"`,
+			},
+		},
+		{
+			name: "TCP upstream - with load balancer",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "tcp-lb-node1",
+						Type: 1,
+						TCP: models.Upstream_TCP{
+							Host:       "api-1.default.svc",
+							Port:       8080,
+							ServerPort: 9000,
+							LoadBalancer: &models.LoadBalancerConfig{
+								Group:    "api-cluster",
+								GroupKey: "secret-key",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "tcp-lb-node1"`,
+				`type = "tcp"`,
+				`loadBalancer.group = "api-cluster"`,
+				`loadBalancer.groupKey = "secret-key"`,
+			},
+		},
+		{
+			name: "TCP upstream - socks5 plugin",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "socks5-proxy",
+						Type: 1,
+						TCP: models.Upstream_TCP{
+							ServerPort: 1080,
+							Plugin: &models.PluginConfig{
+								Type:     "socks5",
+								Username: "proxyuser",
+								Password: "proxypass",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "socks5-proxy"`,
+				`type = "tcp"`,
+				`remotePort = 1080`,
+				`plugin = "socks5"`,
+				`plugin.username = "proxyuser"`,
+				`plugin.password = "proxypass"`,
+			},
+			wantNotContain: []string{
+				`localIP`,
+				`localPort`,
+			},
+		},
+		{
+			name: "TCP upstream - http_proxy plugin",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "http-proxy",
+						Type: 1,
+						TCP: models.Upstream_TCP{
+							ServerPort: 8118,
+							Plugin: &models.PluginConfig{
+								Type:     "http_proxy",
+								Username: "proxyuser",
+								Password: "proxypass",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "http-proxy"`,
+				`plugin = "http_proxy"`,
+				`plugin.httpUser = "proxyuser"`,
+				`plugin.httpPassword = "proxypass"`,
+			},
+		},
+		{
+			name: "TCP upstream - static_file plugin",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "file-server",
+						Type: 1,
+						TCP: models.Upstream_TCP{
+							ServerPort: 8080,
+							Plugin: &models.PluginConfig{
+								Type:         "static_file",
+								LocalPath:    "/data/public",
+								StripPrefix:  "/download",
+								HTTPUser:     "admin",
+								HTTPPassword: "secret",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`plugin = "static_file"`,
+				`plugin.localPath = "/data/public"`,
+				`plugin.stripPrefix = "/download"`,
+				`plugin.httpUser = "admin"`,
+				`plugin.httpPassword = "secret"`,
+			},
+		},
+		{
+			name: "TCP upstream - unix_domain_socket plugin",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "docker-api",
+						Type: 1,
+						TCP: models.Upstream_TCP{
+							ServerPort: 2375,
+							Plugin: &models.PluginConfig{
+								Type:     "unix_domain_socket",
+								UnixPath: "/var/run/docker.sock",
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`plugin = "unix_domain_socket"`,
+				`plugin.unixPath = "/var/run/docker.sock"`,
+			},
+		},
+		{
+			name: "TCPMUX upstream",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "mux-service",
+						Type: 7,
+						TCPMUX: models.Upstream_TCPMUX{
+							Host:          "internal-service.default.svc",
+							Port:          8080,
+							Multiplexer:   "httpconnect",
+							CustomDomains: []string{"mux.example.com"},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`[[proxies]]`,
+				`name = "mux-service"`,
+				`type = "tcpmux"`,
+				`multiplexer = "httpconnect"`,
+				`localIP = "internal-service.default.svc"`,
+				`localPort = 8080`,
+				`customDomains = ["mux.example.com"]`,
+			},
+		},
+		{
+			name: "TCPMUX upstream with transport",
+			config: models.Config{
+				Common: basicCommon(),
+				Upstreams: []models.Upstream{
+					{
+						Name: "mux-encrypted",
+						Type: 7,
+						TCPMUX: models.Upstream_TCPMUX{
+							Host:          "service.default.svc",
+							Port:          8080,
+							Multiplexer:   "httpconnect",
+							CustomDomains: []string{"mux.example.com"},
+							Transport: &models.Upstream_TCP_Transport{
+								UseEncryption:  true,
+								UseCompression: true,
+							},
+						},
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`name = "mux-encrypted"`,
+				`type = "tcpmux"`,
+				`transport.useEncryption = true`,
+				`transport.useCompression = true`,
+			},
+		},
+		{
+			name: "common config with transport tuning",
+			config: models.Config{
+				Common: models.Common{
+					ServerAddress: "frp.example.com",
+					ServerPort:    7000,
+					AdminAddress:  "0.0.0.0",
+					AdminPort:     7400,
+					AdminUsername: "admin",
+					AdminPassword: "secret",
+					Transport: &models.TransportConfig{
+						PoolCount:            5,
+						TCPMux:               true,
+						DialServerTimeout:    "15s",
+						DialServerKeepalive:  "30s",
+						ConnectServerLocalIP: "10.0.0.5",
+					},
+				},
+			},
+			wantErr: false,
+			wantContains: []string{
+				`transport.poolCount = 5`,
+				`transport.tcpMux = true`,
+				`transport.dialServerTimeout = "15s"`,
+				`transport.dialServerKeepalive = "30s"`,
+				`transport.connectServerLocalIP = "10.0.0.5"`,
 			},
 		},
 	}
